@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Annon AI — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'DM Sans', sans-serif; }
+    body { background: #0e1117; display: flex; align-items: center; justify-content: center; height: 100vh; color: #fff; }
+    .auth-box { background: #13161e; border: 1px solid #1f2330; border-radius: 20px; padding: 40px; width: 400px; max-width: 90vw; display: flex; flex-direction: column; gap: 24px; }
+    .auth-logo { display: flex; align-items: center; gap: 12px; }
+    .auth-logo-icon { width: 42px; height: 42px; background: linear-gradient(135deg, #2979ff, #448aff); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; box-shadow: 0 4px 14px rgba(41,121,255,0.4); }
+    .auth-logo h1 { font-size: 22px; font-weight: 600; }
+    .auth-logo h1 span { color: #2979ff; }
+    .auth-title { font-size: 18px; font-weight: 600; color: #fff; }
+    .auth-subtitle { font-size: 13px; color: #4a5068; margin-top: 4px; }
+    .auth-form { display: flex; flex-direction: column; gap: 14px; }
+    .auth-field { display: flex; flex-direction: column; gap: 6px; }
+    .auth-field label { font-size: 12px; color: #4a5068; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .auth-field input { background: #0e1117; border: 1px solid #1f2330; border-radius: 10px; padding: 12px 16px; color: #d0d8f0; font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s; }
+    .auth-field input:focus { border-color: #2979ff; }
+    .auth-btn { background: #2979ff; border: none; border-radius: 10px; padding: 13px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s, box-shadow 0.2s; margin-top: 4px; }
+    .auth-btn:hover { background: #1565c0; box-shadow: 0 4px 14px rgba(41,121,255,0.35); }
+    .auth-error { font-size: 13px; text-align: center; min-height: 18px; color: #ff6666; }
+    .auth-link { text-align: center; font-size: 13px; color: #4a5068; }
+    .auth-link a { color: #2979ff; text-decoration: none; font-weight: 600; }
+    .auth-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">A</div>
+      <h1>Annon <span>AI</span></h1>
+    </div>
+
+    <div>
+      <p class="auth-title">Welcome back, Idan</p>
+      <p class="auth-subtitle">Login to continue to Annon AI</p>
+    </div>
+
+    <div class="auth-form">
+      <div class="auth-field">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter your username" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Enter your password" />
+      </div>
+      <p class="auth-error" id="authError"></p>
+      <button class="auth-btn" onclick="handleLogin()">Login</button>
+    </div>
+
+    <p class="auth-link">Don't have an account? <a href="register.html">Register</a></p>
+  </div>
+
+  <script>
+    const SERVER = "http://127.0.0.1:5000";
+
+    async function handleLogin() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorEl = document.getElementById("authError");
+
+      if (!username || !password) {
+        errorEl.textContent = "Please fill in all fields.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`${SERVER}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          errorEl.textContent = data.error;
+        } else {
+          localStorage.setItem("annon_token", data.token);
+          localStorage.setItem("annon_username", data.username);
+          window.location.href = "index.html";
+        }
+      } catch (e) {
+        errorEl.textContent = "Could not connect to server.";
+      }
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") handleLogin();
+    });
+
+    // If already logged in, skip to chat
+    const token = localStorage.getItem("annon_token");
+    if (token) window.location.href = "index.html";
+  </script>
+</body>
+</html>
