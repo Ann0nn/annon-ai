@@ -1,4 +1,5 @@
-const SERVER = "http://127.0.0.1:5000";
+const SERVER = "https://annon-ai-production.up.railway.app";
+
 const chatBox = document.getElementById("chatBox");
 const userInput = document.getElementById("userInput");
 const chatList = document.getElementById("chatList");
