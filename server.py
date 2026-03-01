@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 
 app = Flask(__name__)
-CORS(app, origins=["http://127.0.0.1:5500", "http://localhost:5500", "https://your-netlify-url.netlify.app"], supports_credentials=True)
+CORS(app, origins=["http://127.0.0.1:5500", "http://localhost:5500", "annonai.netlify.app"], supports_credentials=True)
 
 import os
 from dotenv import load_dotenv
