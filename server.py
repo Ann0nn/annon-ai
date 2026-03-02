@@ -12,6 +12,8 @@ CORS(app, supports_credentials=True)
 import os
 from dotenv import load_dotenv
 load_dotenv()
+print("GROQ KEY:", GROQ_API_KEY[:5] if GROQ_API_KEY else "MISSING")
+print("COINGECKO KEY:", COINGECKO_API_KEY[:5] if COINGECKO_API_KEY else "MISSING")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
