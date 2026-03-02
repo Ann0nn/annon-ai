@@ -127,6 +127,15 @@ def get_top_cryptos():
     except Exception as e:
         print("TOP CRYPTO ERROR:", e)
     return None
+def build_crypto_context(user_message):
+    msg = user_message.lower()
+    
+    # Don't fetch data for greetings
+    greetings = ["hi", "hello", "hey", "what's up", "howdy", "sup", "good morning", "good evening"]
+    if msg.strip() in greetings:
+        return ""
+    
+    context = ""
 
 def build_crypto_context(user_message):
     msg = user_message.lower()
