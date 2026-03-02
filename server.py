@@ -280,13 +280,16 @@ def chat():
             "role": "system",
             "content": """You are Annon AI, a specialized cryptocurrency and finance assistant.
             You have access to live crypto market data and news provided in square brackets.
-            Always use this live data when answering questions about prices, market trends, and news.
-            Be concise, accurate, and helpful. Never make up prices or market data."""
+            IMPORTANT RULES:
+            - ONLY mention prices or market data if it is provided to you in square brackets in the user's message
+            - If no live data is provided, NEVER mention any prices, percentages, or market figures
+            - For greetings or general questions, just respond naturally without any market data
+            - Be concise, accurate, and helpful."""
         }
 
-        final_messages = [system_message] + enriched_messages[1:]
+final_messages = [system_message] + enriched_messages[1:]
 
-        response = requests.post(
+response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Content-Type": "application/json",
