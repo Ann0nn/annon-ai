@@ -137,10 +137,6 @@ def build_crypto_context(user_message):
     
     context = ""
 
-def build_crypto_context(user_message):
-    msg = user_message.lower()
-    context = ""
-
     coin_map = {
         "bitcoin": "bitcoin", "btc": "bitcoin",
         "ethereum": "ethereum", "eth": "ethereum",
