@@ -17,11 +17,9 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 print("GROQ KEY:", GROQ_API_KEY[:5] if GROQ_API_KEY else "MISSING")
 print("COINGECKO KEY:", COINGECKO_API_KEY[:5] if COINGECKO_API_KEY else "MISSING")
 
-
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-# ========== DATABASE ==========
 DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
 
 def get_db():
@@ -80,7 +78,7 @@ def get_user_from_token(req):
         print("TOKEN ERROR:", e)
     return None
 
-# ========== CRYPTO DATA ==========
+# ========== CRYPTO ==========
 def get_crypto_price(coin_id):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true"
@@ -127,14 +125,14 @@ def get_top_cryptos():
     except Exception as e:
         print("TOP CRYPTO ERROR:", e)
     return None
+
 def build_crypto_context(user_message):
-    msg = user_message.lower()
-    
-    # Don't fetch data for greetings
-    greetings = ["hi", "hello", "hey", "what's up", "howdy", "sup", "good morning", "good evening"]
-    if msg.strip() in greetings:
+    msg = user_message.lower().strip()
+
+    # Skip for short/greeting messages
+    if len(msg) < 15:
         return ""
-    
+
     context = ""
 
     coin_map = {
@@ -152,7 +150,8 @@ def build_crypto_context(user_message):
         "polkadot": "polkadot", "dot": "polkadot",
         "shiba": "shiba-inu", "shib": "shiba-inu",
         "tron": "tron", "trx": "tron",
-        "pepe": "pepe", "toncoin": "the-open-network", "ton": "the-open-network"
+        "pepe": "pepe",
+        "toncoin": "the-open-network", "ton": "the-open-network"
     }
 
     for keyword, coin_id in coin_map.items():
@@ -246,11 +245,11 @@ def me():
 # ========== CHAT ==========
 @app.route("/chat", methods=["POST"])
 def chat():
-    try:
-        user = get_user_from_token(request)
-        if not user:
-            return jsonify({ "error": "Not logged in" }), 401
+    user = get_user_from_token(request)
+    if not user:
+        return jsonify({ "error": "Not logged in" }), 401
 
+    try:
         data = request.get_json()
         messages = data.get("messages", [])
         session_id = data.get("session_id")
@@ -281,15 +280,15 @@ def chat():
             "content": """You are Annon AI, a specialized cryptocurrency and finance assistant.
             You have access to live crypto market data and news provided in square brackets.
             IMPORTANT RULES:
-            - ONLY mention prices or market data if it is provided to you in square brackets in the user's message
+            - ONLY mention prices or market data if it is provided in square brackets in the user message
             - If no live data is provided, NEVER mention any prices, percentages, or market figures
-            - For greetings or general questions, just respond naturally without any market data
+            - For greetings or general questions, respond naturally without any market data
             - Be concise, accurate, and helpful."""
         }
 
-final_messages = [system_message] + enriched_messages[1:]
+        final_messages = [system_message] + enriched_messages[1:]
 
-response = requests.post(
+        response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Content-Type": "application/json",
@@ -309,6 +308,7 @@ response = requests.post(
         conn.close()
 
         return jsonify({ "reply": reply, "time": time_now })
+
     except Exception as e:
         print("CHAT ERROR:", e)
         return jsonify({ "error": "Server error" }), 500
@@ -316,11 +316,10 @@ response = requests.post(
 # ========== SESSIONS ==========
 @app.route("/sessions", methods=["GET"])
 def get_sessions():
+    user = get_user_from_token(request)
+    if not user:
+        return jsonify({ "error": "Not logged in" }), 401
     try:
-        user = get_user_from_token(request)
-        if not user:
-            return jsonify({ "error": "Not logged in" }), 401
-
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT id, title, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],))
@@ -333,11 +332,10 @@ def get_sessions():
 
 @app.route("/sessions/<session_id>", methods=["GET"])
 def get_session_messages(session_id):
+    user = get_user_from_token(request)
+    if not user:
+        return jsonify({ "error": "Not logged in" }), 401
     try:
-        user = get_user_from_token(request)
-        if not user:
-            return jsonify({ "error": "Not logged in" }), 401
-
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT sender, text, time FROM messages WHERE session_id = ? ORDER BY id", (session_id,))
@@ -350,11 +348,10 @@ def get_session_messages(session_id):
 
 @app.route("/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
+    user = get_user_from_token(request)
+    if not user:
+        return jsonify({ "error": "Not logged in" }), 401
     try:
-        user = get_user_from_token(request)
-        if not user:
-            return jsonify({ "error": "Not logged in" }), 401
-
         conn = get_db()
         c = conn.cursor()
         c.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["user_id"]))
