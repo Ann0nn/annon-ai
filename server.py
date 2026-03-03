@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
@@ -13,29 +14,26 @@ load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 print("GROQ KEY:", GROQ_API_KEY[:5] if GROQ_API_KEY else "MISSING")
 print("COINGECKO KEY:", COINGECKO_API_KEY[:5] if COINGECKO_API_KEY else "MISSING")
+print("DATABASE URL:", DATABASE_URL[:20] if DATABASE_URL else "MISSING")
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
-
+# ========== DATABASE ==========
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn
-
-
 
 def init_db():
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE,
             password TEXT
         )''')
@@ -51,7 +49,7 @@ def init_db():
             created_at TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             session_id TEXT,
             sender TEXT,
             text TEXT,
@@ -72,11 +70,11 @@ def get_user_from_token(req):
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT user_id, username FROM tokens WHERE token = ?", (token,))
+        c.execute("SELECT user_id, username FROM tokens WHERE token = %s", (token,))
         row = c.fetchone()
         conn.close()
         if row:
-            return { "user_id": row[0], "username": row[1] }
+            return { "user_id": row["user_id"], "username": row["username"] }
     except Exception as e:
         print("TOKEN ERROR:", e)
     return None
@@ -132,7 +130,6 @@ def get_top_cryptos():
 def build_crypto_context(user_message):
     msg = user_message.lower().strip()
 
-    # Skip for short/greeting messages
     if len(msg) < 15:
         return ""
 
@@ -190,11 +187,11 @@ def register():
         hashed = generate_password_hash(password)
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
+        c.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed))
         conn.commit()
         conn.close()
         return jsonify({ "success": True })
-    except sqlite3.IntegrityError:
+    except psycopg2.errors.UniqueViolation:
         return jsonify({ "error": "Username already taken" }), 400
     except Exception as e:
         print("REGISTER ERROR:", e)
@@ -209,15 +206,15 @@ def login():
 
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id, password FROM users WHERE username = ?", (username,))
+        c.execute("SELECT id, password FROM users WHERE username = %s", (username,))
         user = c.fetchone()
 
-        if not user or not check_password_hash(user[1], password):
+        if not user or not check_password_hash(user["password"], password):
             conn.close()
             return jsonify({ "error": "Invalid username or password" }), 401
 
         token = secrets.token_hex(32)
-        c.execute("INSERT INTO tokens (token, user_id, username) VALUES (?, ?, ?)", (token, user[0], username))
+        c.execute("INSERT INTO tokens (token, user_id, username) VALUES (%s, %s, %s)", (token, user["id"], username))
         conn.commit()
         conn.close()
         return jsonify({ "success": True, "token": token, "username": username })
@@ -231,7 +228,7 @@ def logout():
         token = request.headers.get("Authorization", "").replace("Bearer ", "")
         conn = get_db()
         c = conn.cursor()
-        c.execute("DELETE FROM tokens WHERE token = ?", (token,))
+        c.execute("DELETE FROM tokens WHERE token = %s", (token,))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -270,11 +267,14 @@ def chat():
 
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO sessions (id, user_id, title, created_at) VALUES (?, ?, ?, ?)",
-                  (session_id, user["user_id"], session_title, datetime.now().isoformat()))
+        c.execute("""
+            INSERT INTO sessions (id, user_id, title, created_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (session_id, user["user_id"], session_title, datetime.now().isoformat()))
 
         time_now = datetime.now().strftime("%I:%M %p")
-        c.execute("INSERT INTO messages (session_id, sender, text, time) VALUES (?, ?, ?, ?)",
+        c.execute("INSERT INTO messages (session_id, sender, text, time) VALUES (%s, %s, %s, %s)",
                   (session_id, "user", user_message, time_now))
         conn.commit()
 
@@ -304,9 +304,9 @@ def chat():
         print("GROQ RESPONSE:", response.status_code)
         reply = response.json()["choices"][0]["message"]["content"]
 
-        c.execute("INSERT INTO messages (session_id, sender, text, time) VALUES (?, ?, ?, ?)",
+        c.execute("INSERT INTO messages (session_id, sender, text, time) VALUES (%s, %s, %s, %s)",
                   (session_id, "bot", reply, time_now))
-        c.execute("UPDATE sessions SET title = ? WHERE id = ?", (session_title, session_id))
+        c.execute("UPDATE sessions SET title = %s WHERE id = %s", (session_title, session_id))
         conn.commit()
         conn.close()
 
@@ -325,10 +325,10 @@ def get_sessions():
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id, title, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],))
+        c.execute("SELECT id, title, created_at FROM sessions WHERE user_id = %s ORDER BY created_at DESC", (user["user_id"],))
         rows = c.fetchall()
         conn.close()
-        return jsonify([{ "id": r[0], "title": r[1], "created_at": r[2] } for r in rows])
+        return jsonify([{ "id": r["id"], "title": r["title"], "created_at": r["created_at"] } for r in rows])
     except Exception as e:
         print("SESSIONS ERROR:", e)
         return jsonify({ "error": "Server error" }), 500
@@ -341,10 +341,10 @@ def get_session_messages(session_id):
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT sender, text, time FROM messages WHERE session_id = ? ORDER BY id", (session_id,))
+        c.execute("SELECT sender, text, time FROM messages WHERE session_id = %s ORDER BY id", (session_id,))
         rows = c.fetchall()
         conn.close()
-        return jsonify([{ "sender": r[0], "text": r[1], "time": r[2] } for r in rows])
+        return jsonify([{ "sender": r["sender"], "text": r["text"], "time": r["time"] } for r in rows])
     except Exception as e:
         print("SESSION MESSAGES ERROR:", e)
         return jsonify({ "error": "Server error" }), 500
@@ -357,8 +357,8 @@ def delete_session(session_id):
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["user_id"]))
-        c.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+        c.execute("DELETE FROM sessions WHERE id = %s AND user_id = %s", (session_id, user["user_id"]))
+        c.execute("DELETE FROM messages WHERE session_id = %s", (session_id,))
         conn.commit()
         conn.close()
         return jsonify({ "success": True })
