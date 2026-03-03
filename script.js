@@ -319,3 +319,10 @@ async function logout() {
   localStorage.removeItem("annon_username");
   window.location.href = "login.html";
 }
+// ========== SIDEBAR TOGGLE ==========
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("overlay");
+  sidebar.classList.toggle("open");
+  overlay.classList.toggle("show");
+}
