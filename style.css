@@ -486,6 +486,10 @@ body.light .profile-field select { background: #f0f2f8; border-color: #e0e4f0; c
     display: block;
   }
 
+  body {
+    overflow: hidden;
+  }
+
   .sidebar {
     position: fixed;
     left: -280px;
@@ -502,27 +506,69 @@ body.light .profile-field select { background: #f0f2f8; border-color: #e0e4f0; c
   }
 
   .main {
-    width: 100%;
-  }
-
-  .chat-box {
-    padding: 16px;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .chat-header {
-    padding: 14px 16px;
+    padding: 12px 14px;
+    flex-shrink: 0;
+  }
+
+  .chat-header-left h2 {
+    font-size: 15px;
+  }
+
+  .header-btn span,
+  .header-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .chat-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    min-height: 0;
   }
 
   .chat-input-area {
-    padding: 10px 16px 16px;
+    padding: 10px 14px 16px;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: #0e1117;
+  }
+
+  .input-box {
+    padding: 8px 10px;
+  }
+
+  .input-box input {
+    font-size: 13px;
+  }
+
+  .send-btn {
+    padding: 8px 14px;
+    font-size: 13px;
   }
 
   .message-bubble {
     font-size: 13px;
+    padding: 10px 14px;
   }
 
   .bubble-wrap {
-    max-width: 90%;
+    max-width: 88%;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
   }
 
   .overlay {

@@ -23,9 +23,11 @@ CORS(app, supports_credentials=True)
 DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     return conn
+
 
 
 def init_db():
